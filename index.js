@@ -8,6 +8,8 @@ $(document).ready(function(){
     });
 });
 
+let socket = null;
+
 function startChat() {
     const userId = document.getElementById('userId').value.trim();
     if (userId) {
@@ -17,9 +19,37 @@ function startChat() {
         document.getElementById('username').textContent = userId;
 
         // 서버 연결
+        connectServer(userId);
 
         addSystemMessage('채팅방에 입장하였습니다.');
     }
+}
+
+function connectServer(userId){
+    socket = new WebSocket('ws://localhost:8081');
+    //3.35.189.170
+
+    socket.onopen = () => {
+        console.log('서버와 연결됨');
+        const initMsg = { type: 'init', userId: userId};
+        socket.send(JSON.stringify(initMsg));
+    }
+
+    socket.onmessage = (event) => {
+        console.log('카톡');
+        const data = JSON.parse(event.data);
+        addMessage(data.userId, data.text, false, new Date(data.createAt));
+    }
+
+    socket.onclose = () => {
+        console.log('서버와의 연결이 닫혔습니다.');
+        location.reload();
+    };
+
+    socket.onerror = (error) => {
+        console.error('WebSocket 에러 발생:', error);
+        //location.reload();
+    };
 }
 
 function sendMessage() {
@@ -27,34 +57,35 @@ function sendMessage() {
     const message = input.value.trim();
     if (message) {
         const username = document.getElementById('username').textContent;
-        const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-        addMessage(username, message, time);
+        addMessage(username, message, true, null);
         input.value = '';
     }
 }
 
-function addMessage(sender, text, time) {
+function addMessage(sender, text, isSelf, time) {
+    const timeVal = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
     const messageList = document.getElementById('messageList');
     const messageDiv = document.createElement('div');
-    messageDiv.className = `flex justify-end`;
+    messageDiv.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
     messageDiv.innerHTML = `
-                <div class="bg-custom text-white rounded-lg px-4 py-2 max-w-[70%]">
-                    <div class="text-sm font-medium mb-1">${sender}</div>
-                    <div>${text}</div>
-                    <div class="text-xs text-white/80 text-right mt-1">${time}</div>
-                </div>
+                <div class="${isSelf ? 'bg-custom text-white' : 'bg-gray-100 text-gray-800'} rounded-lg px-4 py-2 max-w-[70%]">
+                <div class="text-sm font-medium mb-1">${sender}</div>
+                <div>${text}</div>
+                <div class="text-xs ${isSelf ? 'text-white/80' : 'text-gray-500'} text-right mt-1">${timeVal}</div>
+                </div>  
             `;
     messageList.appendChild(messageDiv);
     messageList.scrollTop = messageList.scrollHeight;
-
-    // 서버에 메시지 전송
-
-    //messageDiv.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
-    // <div className="${isSelf ? 'bg-custom text-white' : 'bg-gray-100 text-gray-800'} rounded-lg px-4 py-2 max-w-[70%]">
-    //     <div className="text-sm font-medium mb-1">${sender}</div>
-    //     <div>${text}</div>
-    //     <div className="text-xs ${isSelf ? 'text-white/80' : 'text-gray-500'} text-right mt-1">${time}</div>
-    // </div>
+    if(isSelf){
+        const msgToSend = {
+            type: 'chat',
+            room: 'default',
+            userId: sender,
+            text: text,
+            createAt: time
+        }
+        socket.send(JSON.stringify(msgToSend));
+    }
 }
 
 

@@ -26,8 +26,7 @@ function startChat() {
 }
 
 function connectServer(userId){
-    socket = new WebSocket('ws://localhost:8081');
-    //3.35.189.170
+    socket = new WebSocket('ws://15.165.20.185:8081');
 
     socket.onopen = () => {
         console.log('서버와 연결됨');
@@ -38,7 +37,7 @@ function connectServer(userId){
     socket.onmessage = (event) => {
         console.log('카톡');
         const data = JSON.parse(event.data);
-        addMessage(data.userId, data.text, false, new Date(data.createAt));
+        addMessage(data);
     }
 
     socket.onclose = () => {
@@ -57,15 +56,28 @@ function sendMessage() {
     const message = input.value.trim();
     if (message) {
         const username = document.getElementById('username').textContent;
-        addMessage(username, message, true, null);
         input.value = '';
+        const msgToSend = {
+            type: 'chat',
+            room: 'default',
+            userId: username,
+            text: message,
+        }
+        socket.send(JSON.stringify(msgToSend));
     }
 }
 
-function addMessage(sender, text, isSelf, time) {
-    const timeVal = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+function addMessage(data) {
+    const userId = document.getElementById('userId').value.trim();
+
+    const sender = data.userId;
+    const isSelf = sender === userId;
+    const text = data.text;
+    const timeVal = new Date(data.createAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    console.log(data.createAt);
     const messageList = document.getElementById('messageList');
     const messageDiv = document.createElement('div');
+
     messageDiv.className = `flex ${isSelf ? 'justify-end' : 'justify-start'}`;
     messageDiv.innerHTML = `
                 <div class="${isSelf ? 'bg-custom text-white' : 'bg-gray-100 text-gray-800'} rounded-lg px-4 py-2 max-w-[70%]">
@@ -76,16 +88,6 @@ function addMessage(sender, text, isSelf, time) {
             `;
     messageList.appendChild(messageDiv);
     messageList.scrollTop = messageList.scrollHeight;
-    if(isSelf){
-        const msgToSend = {
-            type: 'chat',
-            room: 'default',
-            userId: sender,
-            text: text,
-            createAt: time
-        }
-        socket.send(JSON.stringify(msgToSend));
-    }
 }
 
 
